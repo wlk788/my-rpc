@@ -6,7 +6,12 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="myrpc-demo" />
+        <module name="myrpc-server-demo" />
+        <module name="myrpc-api" />
+        <module name="myrpc-common" />
+        <module name="myrpc-core" />
+        <module name="myrpc-client-demo" />
+        <module name="myrpc-manager" />
       </profile>
     </annotationProcessing>
   </component>

@@ -9,33 +9,16 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>myrpc-demo</artifactId>
+    <artifactId>myrpc-framework</artifactId>
     <packaging>pom</packaging>
     <modules>
-        <module>myrpc-client-demo</module>
-        <module>myrpc-server-demo</module>
-        <module>myrpc-api</module>
+        <module>myrpc-common</module>
+        <module>myrpc-core</module>
     </modules>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
     </properties>
-
-    <dependencies>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-all</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.zookeeper</groupId>
-            <artifactId>zookeeper</artifactId>
-        </dependency>
-    </dependencies>
 
 </project>
