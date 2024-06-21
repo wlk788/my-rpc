@@ -1,6 +1,7 @@
-/.idea
-/target
-/out
+.idea/
+target/
+out/
+.svn/
 *.iml
 
 # 编译文件

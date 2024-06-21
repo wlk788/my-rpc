@@ -20,6 +20,12 @@
         <dependency>
             <groupId>com.wlk</groupId>
             <artifactId>myrpc-api</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.wlk</groupId>
+            <artifactId>myrpc-core</artifactId>
+            <version>1.0-SNAPSHOT</version>
         </dependency>
     </dependencies>
 
