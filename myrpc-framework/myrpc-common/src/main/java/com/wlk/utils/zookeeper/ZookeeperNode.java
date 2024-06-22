@@ -1,4 +1,4 @@
-package com.wlk.utils;
+package com.wlk.utils.zookeeper;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

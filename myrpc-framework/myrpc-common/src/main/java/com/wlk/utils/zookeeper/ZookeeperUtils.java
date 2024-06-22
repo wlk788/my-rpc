@@ -1,4 +1,4 @@
-package com.wlk.utils;
+package com.wlk.utils.zookeeper;
 
 import com.wlk.Constant;
 import com.wlk.exceptions.ZookeeperException;
@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 @Slf4j
-public class ZookeeperUtil {
+public class ZookeeperUtils {
 
 
     /**
@@ -72,14 +72,14 @@ public class ZookeeperUtil {
 
     /**
      * 判断节点是否存在
-     * @param zk zk实例
+     * @param zooKeeper zk实例
      * @param node  节点路劲
      * @param watcher watcher
      * @return ture 存在 | false 不存在
      */
-    public static boolean exists(ZooKeeper zk,String node,Watcher watcher){
+    public static boolean exists(ZooKeeper zooKeeper,String node,Watcher watcher){
         try {
-            return zk.exists(node,watcher) != null;
+            return zooKeeper.exists(node,watcher) != null;
         } catch (KeeperException | InterruptedException e) {
             log.error("判断节点[{}]是否存在是发生异常",node,e);
             throw new ZookeeperException(e);

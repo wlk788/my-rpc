@@ -1,15 +1,12 @@
 package com.wlk;
 
-import com.wlk.utils.MyWatcher;
-import com.wlk.utils.ZookeeperNode;
-import com.wlk.utils.ZookeeperUtil;
+import com.wlk.utils.zookeeper.ZookeeperNode;
+import com.wlk.utils.zookeeper.ZookeeperUtils;
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.data.Stat;
 
-import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -32,16 +29,18 @@ public class Application {
         //             └─ node3 [data]
         //  └─ config
 
-        ZooKeeper zooKeeper = ZookeeperUtil.createZookeeper();
-        String basePath = "/Myrpc-metadata";
+        ZooKeeper zooKeeper = ZookeeperUtils.createZookeeper();
+        String basePath = "/myrpc-metadata";
         String providerPath = basePath + "/providers";
         String consumersPath = basePath + "/consumers";
         ZookeeperNode baseNode = new ZookeeperNode(basePath, null);
         ZookeeperNode providersNode = new ZookeeperNode(providerPath, null);
         ZookeeperNode consumersNode = new ZookeeperNode(consumersPath, null);
 
-        List.of(baseNode, providersNode, consumersNode).forEach(node -> ZookeeperUtil.createNode(zooKeeper, node, null, CreateMode.PERSISTENT));
+        List<ZookeeperNode> list = new ArrayList<>();
+        Collections.addAll(list, baseNode, providersNode, consumersNode);
+        list.forEach(node -> ZookeeperUtils.createNode(zooKeeper, node, null, CreateMode.PERSISTENT));
 
-        ZookeeperUtil.close(zooKeeper);
+        ZookeeperUtils.close(zooKeeper);
     }
 }
