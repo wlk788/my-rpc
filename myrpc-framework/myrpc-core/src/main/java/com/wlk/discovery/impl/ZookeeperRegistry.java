@@ -52,7 +52,8 @@ public class ZookeeperRegistry implements Registry {
     @Override
     public List<InetSocketAddress> lookup(String serviceName, String group) {
         //1、找到服务的节点
-        String serviceNode = Constant.BASE_PROVIDERS_PATH + "/" + serviceName + "/" + group;
+//        String serviceNode = Constant.BASE_PROVIDERS_PATH + "/" + serviceName + "/" + group;
+        String serviceNode = Constant.BASE_PROVIDERS_PATH + "/" + serviceName;
         //2、找到子节点
         List<String> children = ZookeeperUtils.getChildren(zooKeeper, serviceNode, null);
         // 获取了所有可用的列表

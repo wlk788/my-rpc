@@ -1,13 +1,28 @@
 package com.wlk;
 
+import com.wlk.channelHandler.handler.MethodCallHandler;
+import com.wlk.channelHandler.handler.MyRpcRequestDecoder;
+import com.wlk.channelHandler.handler.MyRpcResponseEncoder;
 import com.wlk.discovery.Registry;
 import com.wlk.discovery.RegistryConfig;
 import com.wlk.utils.zookeeper.ZookeeperUtils;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.logging.LoggingHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.Id;
 
+import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
@@ -21,8 +36,17 @@ public class MyrpcBootstrap {
     private Registry registry;
     private ZooKeeper zookeeper;
 
+    // 连接的缓存,如果使用InetSocketAddress这样的类做key，一定要看他有没有重写equals方法和toString方法
+    public final static Map<InetSocketAddress, Channel> CHANNEL_CACHE = new ConcurrentHashMap<>(16);
+
     // 维护已经发布且暴露的服务列表 key-> interface的全限定名  value -> ServiceConfig
     public final static Map<String, ServiceConfig<?>> SERVERS_LIST = new ConcurrentHashMap<>(16);
+
+    // 定义全局的对外挂起的 completableFuture
+    public final static Map<Long, CompletableFuture<Object>> PENDING_REQUEST = new ConcurrentHashMap<>(128);
+
+    //Id生成器
+    public final static IdGenerator idGenerator = new IdGenerator(1, 2);
 
     public MyrpcBootstrap() {
         zookeeper = ZookeeperUtils.createZookeeper();
@@ -80,10 +104,46 @@ public class MyrpcBootstrap {
     }
 
     public void start(){
+        // 注册关闭应用程序的钩子函数
+//        Runtime.getRuntime().addShutdownHook(new MyrpcShutdownHook());
+
+        // 1、创建eventLoop，老板只负责处理请求，之后会将请求分发至worker
+        EventLoopGroup boss = new NioEventLoopGroup(2);
+        EventLoopGroup worker = new NioEventLoopGroup(10);
         try {
-            Thread.sleep(30000);
+
+            // 2、需要一个服务器引导程序
+            ServerBootstrap serverBootstrap = new ServerBootstrap();
+            // 3、配置服务器
+            serverBootstrap = serverBootstrap.group(boss, worker)
+                    .channel(NioServerSocketChannel.class)
+                    .childHandler(new ChannelInitializer<SocketChannel>() {
+                        @Override
+                        protected void initChannel(SocketChannel socketChannel) throws Exception {
+                            // 是核心，我们需要添加很多入站和出站的handler
+                            socketChannel.pipeline()
+                                    .addLast(new LoggingHandler())
+                                    .addLast(new MyRpcRequestDecoder())
+                                    // 根据请求进行方法调用
+                                    .addLast(new MethodCallHandler())
+                                    .addLast(new MyRpcResponseEncoder())
+                            ;
+                        }
+                    });
+
+            // 4、绑定端口
+            ChannelFuture channelFuture = serverBootstrap.bind(8088).sync();
+
+            channelFuture.channel().closeFuture().sync();
         } catch (InterruptedException e) {
             e.printStackTrace();
+        } finally {
+            try {
+                boss.shutdownGracefully().sync();
+                worker.shutdownGracefully().sync();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 
