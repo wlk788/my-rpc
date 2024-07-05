@@ -5,6 +5,7 @@ import com.wlk.channelHandler.handler.MyRpcRequestDecoder;
 import com.wlk.channelHandler.handler.MyRpcResponseEncoder;
 import com.wlk.discovery.Registry;
 import com.wlk.discovery.RegistryConfig;
+import com.wlk.serialize.SerializerFactory;
 import com.wlk.utils.zookeeper.ZookeeperUtils;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
@@ -47,6 +48,8 @@ public class MyrpcBootstrap {
 
     //Id生成器
     public final static IdGenerator idGenerator = new IdGenerator(1, 2);
+
+    public static byte serializeType = (byte) 1;
 
     public MyrpcBootstrap() {
         zookeeper = ZookeeperUtils.createZookeeper();
@@ -151,6 +154,20 @@ public class MyrpcBootstrap {
         //在这个方法里我们是否可以拿到相关的配置项-注册中心
         // 配置reference，将来调用get方法时，方便生成代理对象
         reference.setRegistry(registry);
+        return this;
+    }
+
+    public MyrpcBootstrap serialize(String serializeString){
+        byte serialize = SerializerFactory.SERIALIZER_CACHE_CODE.get(serializeString);
+        this.serialize(serialize);
+        return this;
+    }
+
+    public MyrpcBootstrap serialize(byte serialize){
+        serializeType = serialize;
+        if (log.isDebugEnabled()){
+            log.debug("我们配置了使用的序列化的方式为【{}】.", serializeType);
+        }
         return this;
     }
 

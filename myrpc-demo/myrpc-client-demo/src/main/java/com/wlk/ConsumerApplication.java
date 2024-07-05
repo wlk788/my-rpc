@@ -17,6 +17,7 @@ public class ConsumerApplication {
         MyrpcBootstrap.getInstance()
                 .application()
                 .registry(new RegistryConfig("zookeeper://127.0.0.1:2181"))
+                .serialize("hessian")
                 .reference(reference);
         HelloMyrpc helloMyrpc = reference.get();
         helloMyrpc.sayHi("你好");

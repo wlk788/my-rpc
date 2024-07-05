@@ -1,5 +1,7 @@
 package com.wlk.channelHandler.handler;
 
+import com.wlk.serialize.Serializer;
+import com.wlk.serialize.SerializerFactory;
 import com.wlk.transport.message.MessageFormatConstant;
 import com.wlk.transport.message.MyRpcRequest;
 import com.wlk.transport.message.RequestPayload;
@@ -48,8 +50,12 @@ public class MyRpcRequestEncoder extends MessageToByteEncoder<MyRpcRequest> {
 
         // 8个字节的请求id
         byteBuf.writeLong(myRpcRequest.getRequestId());
+
+        //序列化+压缩
+        //TODO 压缩方式
+        Serializer serializer = SerializerFactory.getSerializer(myRpcRequest.getSerializeType()).getSerializer();
+        byte[] body = serializer.serialize(myRpcRequest.getRequestPayload());
         //写入请求体
-        byte[] body = getBodyBytes(myRpcRequest.getRequestPayload());
         if(body != null){
             byteBuf.writeBytes(body);
         }
@@ -64,25 +70,6 @@ public class MyRpcRequestEncoder extends MessageToByteEncoder<MyRpcRequest> {
 
         if(log.isDebugEnabled()){
             log.debug("响应【{}】已经在调用端完成编码工作。",myRpcRequest.getRequestId());
-        }
-    }
-
-    private byte[] getBodyBytes(RequestPayload requestPayload) {
-        if(requestPayload == null){
-            return null;
-        }
-        //序列化+压缩
-        //TODO 压缩方式
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        try {
-            ObjectOutputStream objectOutputStream = new ObjectOutputStream(bos);
-            objectOutputStream.writeObject(requestPayload);
-            //压缩
-
-            return bos.toByteArray();
-        } catch (IOException e) {
-            log.error("序列化时出现异常");
-            throw new RuntimeException(e);
         }
     }
 }

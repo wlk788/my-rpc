@@ -1,6 +1,8 @@
 package com.wlk.channelHandler.handler;
 
 import com.wlk.enumeration.RequestType;
+import com.wlk.serialize.Serializer;
+import com.wlk.serialize.SerializerFactory;
 import com.wlk.transport.message.MessageFormatConstant;
 import com.wlk.transport.message.MyRpcRequest;
 import com.wlk.transport.message.MyRpcResponse;
@@ -114,14 +116,8 @@ public class MyRpcResponseDecoder extends LengthFieldBasedFrameDecoder {
         if (payload != null && payload.length != 0){
             //TODO 压缩方式
             //反序列化
-            Object body = null;
-            try {
-                ByteArrayInputStream bis = new ByteArrayInputStream(payload);
-                ObjectInputStream ois = new ObjectInputStream(bis);
-                body =  ois.readObject();
-            } catch (IOException | ClassNotFoundException e) {
-                log.error("反序列化时出现问题");
-            }
+            Serializer serializer = SerializerFactory.getSerializer(serializeType).getSerializer();
+            Object body = serializer.deserialize(payload, Object.class);
             myRpcResponse.setBody(body);
         }
         if(log.isDebugEnabled()){
