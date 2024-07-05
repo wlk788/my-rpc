@@ -1,0 +1,101 @@
+package com.wlk.channelHandler.handler;
+
+import ch.qos.logback.core.rolling.helper.Compressor;
+import com.sun.org.apache.xml.internal.serializer.SerializerFactory;
+import com.wlk.transport.message.MessageFormatConstant;
+import com.wlk.transport.message.MyRpcResponse;
+import com.wlk.transport.message.RequestPayload;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.MessageToByteEncoder;
+import lombok.extern.slf4j.Slf4j;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+
+/**
+ * 自定义协议编码器
+ * <p>
+ * <pre>
+ *   0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15   16   17   18   19   20   21   22
+ *   +----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+----+
+ *   |    magic          |ver |head  len|    full length    |code  ser|comp|              RequestId                |
+ *   +-----+-----+-------+----+----+----+----+-----------+----- ---+--------+----+----+----+----+----+----+---+---+
+ *   |                                                                                                             |
+ *   |                                         body                                                                |
+ *   |                                                                                                             |
+ *   +--------------------------------------------------------------------------------------------------------+---+
+ * </pre>
+ *
+ * 4B magic(魔数)   --->yrpc.getBytes()
+ * 1B version(版本)   ----> 1
+ * 2B header length 首部的长度
+ * 4B full length 报文总长度
+ * 1B serialize
+ * 1B compress
+ * 1B requestType
+ * 8B requestId
+ *
+ * body
+ */
+@Slf4j
+public class MyRpcResponseEncoder extends MessageToByteEncoder<MyRpcResponse> {
+    @Override
+    protected void encode(ChannelHandlerContext channelHandlerContext, MyRpcResponse myRpcResponse, ByteBuf byteBuf) throws Exception {
+        // 4个字节的魔数
+        byteBuf.writeBytes(MessageFormatConstant.MAGIC);
+        // 1个字节的版本号
+        byteBuf.writeByte(MessageFormatConstant.VERSION);
+        // 2个字节的头部长度
+        byteBuf.writeShort(MessageFormatConstant.HEADER_LENGTH);
+        // 先空出总长度(包含body)
+        byteBuf.writerIndex(byteBuf.writerIndex()+MessageFormatConstant.FULL_FIELD_LENGTH);
+
+        // 1个字节的请求类型
+        byteBuf.writeByte(myRpcResponse.getCode());
+        // 1个字节的序列化类型
+        byteBuf.writeByte(myRpcResponse.getSerializeType());
+        // 1个字节的压缩方式
+        byteBuf.writeByte(myRpcResponse.getCompressType());
+
+        // 8个字节的请求id
+        byteBuf.writeLong(myRpcResponse.getRequestId());
+        //写入请求体
+        byte[] body = getBodyBytes(myRpcResponse.getBody());
+        if(body != null){
+            byteBuf.writeBytes(body);
+        }
+        int bodyLength = body == null ? 0 : body.length;
+
+        //回头写报文长度
+        int writerIndex = byteBuf.writerIndex();
+        byteBuf.writerIndex(7);
+        byteBuf.writeInt(MessageFormatConstant.HEADER_LENGTH + bodyLength);
+
+        byteBuf.writerIndex(writerIndex);
+
+        if(log.isDebugEnabled()){
+            log.debug("响应【{}】已经在服务端完成编码工作。",myRpcResponse.getRequestId());
+        }
+    }
+
+    private byte[] getBodyBytes(Object body) {
+        if(body == null){
+            return null;
+        }
+        //序列化+压缩
+        //TODO 压缩方式
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        try {
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(bos);
+            objectOutputStream.writeObject(body);
+            //压缩
+
+            return bos.toByteArray();
+        } catch (IOException e) {
+            log.error("序列化时出现异常");
+            throw new RuntimeException(e);
+        }
+    }
+}
