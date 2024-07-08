@@ -1,6 +1,7 @@
 package com.wlk.channelHandler.handler;
 
-import ch.qos.logback.core.rolling.helper.Compressor;
+import com.wlk.compress.Compressor;
+import com.wlk.compress.CompressorFactory;
 import com.wlk.serialize.Serializer;
 import com.wlk.serialize.SerializerFactory;
 import com.wlk.transport.message.MessageFormatConstant;
@@ -64,9 +65,12 @@ public class MyRpcResponseEncoder extends MessageToByteEncoder<MyRpcResponse> {
         // 8个字节的请求id
         byteBuf.writeLong(myRpcResponse.getRequestId());
         //序列化+压缩
-        //TODO 压缩方式
+        //序列化
         Serializer serializer = SerializerFactory.getSerializer(myRpcResponse.getSerializeType()).getSerializer();
         byte[] body = serializer.serialize(myRpcResponse.getBody());
+        //压缩方式
+        Compressor compressor = CompressorFactory.getCompressor(myRpcResponse.getCompressType()).getCompressor();
+        body = compressor.compress(body);
         //写入请求体
         if(body != null){
             byteBuf.writeBytes(body);

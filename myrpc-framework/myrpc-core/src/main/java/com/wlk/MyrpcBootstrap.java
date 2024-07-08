@@ -3,6 +3,7 @@ package com.wlk;
 import com.wlk.channelHandler.handler.MethodCallHandler;
 import com.wlk.channelHandler.handler.MyRpcRequestDecoder;
 import com.wlk.channelHandler.handler.MyRpcResponseEncoder;
+import com.wlk.compress.CompressorFactory;
 import com.wlk.discovery.Registry;
 import com.wlk.discovery.RegistryConfig;
 import com.wlk.serialize.SerializerFactory;
@@ -50,6 +51,7 @@ public class MyrpcBootstrap {
     public final static IdGenerator idGenerator = new IdGenerator(1, 2);
 
     public static byte serializeType = (byte) 1;
+    public static byte compressType = (byte) 1;
 
     public MyrpcBootstrap() {
         zookeeper = ZookeeperUtils.createZookeeper();
@@ -167,6 +169,20 @@ public class MyrpcBootstrap {
         serializeType = serialize;
         if (log.isDebugEnabled()){
             log.debug("我们配置了使用的序列化的方式为【{}】.", serializeType);
+        }
+        return this;
+    }
+
+    public MyrpcBootstrap compress(String compressString){
+        byte compress = CompressorFactory.COMPRESSOR_CACHE_CODE.get(compressString);
+        this.compress(compress);
+        return this;
+    }
+
+    public MyrpcBootstrap compress(byte compress){
+        compressType = compress;
+        if (log.isDebugEnabled()){
+            log.debug("我们配置了使用的压缩的方式为【{}】.", serializeType);
         }
         return this;
     }

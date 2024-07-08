@@ -1,5 +1,7 @@
 package com.wlk.channelHandler.handler;
 
+import com.wlk.compress.Compressor;
+import com.wlk.compress.CompressorFactory;
 import com.wlk.serialize.Serializer;
 import com.wlk.serialize.SerializerFactory;
 import com.wlk.transport.message.MessageFormatConstant;
@@ -52,9 +54,12 @@ public class MyRpcRequestEncoder extends MessageToByteEncoder<MyRpcRequest> {
         byteBuf.writeLong(myRpcRequest.getRequestId());
 
         //序列化+压缩
-        //TODO 压缩方式
+        //序列化
         Serializer serializer = SerializerFactory.getSerializer(myRpcRequest.getSerializeType()).getSerializer();
         byte[] body = serializer.serialize(myRpcRequest.getRequestPayload());
+        //压缩
+        Compressor compressor = CompressorFactory.getCompressor(myRpcRequest.getCompressType()).getCompressor();
+        body = compressor.compress(body);
         //写入请求体
         if(body != null){
             byteBuf.writeBytes(body);

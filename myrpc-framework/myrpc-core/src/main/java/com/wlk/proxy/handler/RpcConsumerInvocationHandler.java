@@ -85,7 +85,7 @@ public class RpcConsumerInvocationHandler implements InvocationHandler {
                 .build();
         MyRpcRequest myRpcRequest = MyRpcRequest.builder()
                 .requestId(MyrpcBootstrap.idGenerator.getId())
-                .compressType((byte) 1)
+                .compressType(MyrpcBootstrap.compressType)
                 .serializeType(MyrpcBootstrap.serializeType)
                 .requestType(RequestType.REQUEST.getId())
                 .requestPayload(requestPayload)

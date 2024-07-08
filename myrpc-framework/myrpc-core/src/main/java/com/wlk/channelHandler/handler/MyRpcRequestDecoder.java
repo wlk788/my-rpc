@@ -1,5 +1,7 @@
 package com.wlk.channelHandler.handler;
 
+import com.wlk.compress.Compressor;
+import com.wlk.compress.CompressorFactory;
 import com.wlk.enumeration.RequestType;
 import com.wlk.serialize.Serializer;
 import com.wlk.serialize.SerializerFactory;
@@ -89,7 +91,9 @@ public class MyRpcRequestDecoder extends LengthFieldBasedFrameDecoder {
         byteBuf.readBytes(payload);
 
         if (payload != null && payload.length != 0){
-            //TODO 压缩方式
+            //压缩方式
+            Compressor compressor = CompressorFactory.getCompressor(compressType).getCompressor();
+            payload = compressor.decompress(payload);
             //反序列化
             Serializer serializer = SerializerFactory.getSerializer(serializeType).getSerializer();
             RequestPayload requestPayload = serializer.deserialize(payload, RequestPayload.class);
