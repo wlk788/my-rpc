@@ -43,8 +43,7 @@ public class UpAndDownWatcher implements Watcher {
             }
 
             // TODO 获得负载均衡器，进行重新的loadBalance
-
-
+            MyrpcBootstrap.loadBalancer.reLoadBalance(serviceName, addresses);
         }
     }
 

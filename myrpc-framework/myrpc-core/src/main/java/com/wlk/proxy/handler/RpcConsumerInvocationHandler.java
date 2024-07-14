@@ -71,7 +71,7 @@ public class RpcConsumerInvocationHandler implements InvocationHandler {
          */
         System.out.println("hello proxy");
 
-        //TODO 继续掉更负载均衡代码
+        //负载均衡代码
         InetSocketAddress address = MyrpcBootstrap.loadBalancer.selectServiceAddress(interfaceRef.getName());
         if(log.isDebugEnabled()){
             log.debug("服务调用方，发现了服务【{}】的可用主机【{}】", interfaceRef.getName(), address);
