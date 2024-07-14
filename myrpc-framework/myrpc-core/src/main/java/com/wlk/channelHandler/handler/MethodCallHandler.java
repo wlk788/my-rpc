@@ -2,6 +2,7 @@ package com.wlk.channelHandler.handler;
 
 import com.wlk.MyrpcBootstrap;
 import com.wlk.ServiceConfig;
+import com.wlk.enumeration.RequestType;
 import com.wlk.enumeration.RespCode;
 import com.wlk.transport.message.MyRpcRequest;
 import com.wlk.transport.message.MyRpcResponse;
@@ -17,21 +18,29 @@ import java.lang.reflect.Method;
 public class MethodCallHandler extends SimpleChannelInboundHandler<MyRpcRequest> {
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, MyRpcRequest myRpcRequest) throws Exception {
-        //1、先获取负载内容
+        // 1、先封装部分响应
+        MyRpcResponse myRpcResponse = new MyRpcResponse();
+        myRpcResponse.setRequestId(myRpcRequest.getRequestId());
+        myRpcResponse.setCompressType(myRpcRequest.getCompressType());
+        myRpcResponse.setSerializeType(myRpcRequest.getSerializeType());
+        //2、先获取负载内容
         RequestPayload requestPayload = myRpcRequest.getRequestPayload();
 
-        //2、根据负载内容进行方法调用
-        Object result = callTargetMethod(requestPayload);
-        if (log.isDebugEnabled()){
-            log.debug("请求【{}】已经在服务端完成方法调用", myRpcRequest.getRequestId());
+        if (myRpcRequest.getRequestType() == RequestType.HEART_BEAT.getId()) {
+            // 需要封装响应并且返回
+            myRpcResponse.setCode(RespCode.SUCCESS_HEART_BEAT.getCode());
+            if (log.isDebugEnabled()){
+                log.debug("服务端已收到心跳请求【{}】", myRpcRequest.getRequestId());
+            }
         }
-        MyRpcResponse myRpcResponse = MyRpcResponse.builder()
-                .code(RespCode.SUCCESS.getCode())
-                .requestId(myRpcRequest.getRequestId())
-                .serializeType(myRpcRequest.getSerializeType())
-                .compressType(myRpcRequest.getCompressType())
-                .body(result)
-                .build();
+        else{
+            Object result = callTargetMethod(requestPayload);
+            if (log.isDebugEnabled()){
+                log.debug("请求【{}】已经在服务端完成方法调用", myRpcRequest.getRequestId());
+            }
+            myRpcResponse.setCode(RespCode.SUCCESS.getCode());
+            myRpcResponse.setBody(result);
+        }
         channelHandlerContext.channel().writeAndFlush(myRpcResponse);
     }
 

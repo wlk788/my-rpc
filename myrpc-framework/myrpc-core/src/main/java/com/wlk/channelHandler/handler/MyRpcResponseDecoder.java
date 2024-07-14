@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.util.Random;
 
 /**
  * 自定义协议编码器
@@ -62,7 +63,7 @@ public class MyRpcResponseDecoder extends LengthFieldBasedFrameDecoder {
 
     @Override
     protected Object decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
-//        Thread.sleep(new Random().nextInt(50));
+        Thread.sleep(new Random().nextInt(50));
 
         Object decode = super.decode(ctx, in);
         if(decode instanceof ByteBuf){
@@ -99,12 +100,15 @@ public class MyRpcResponseDecoder extends LengthFieldBasedFrameDecoder {
         byte compressType = byteBuf.readByte();
         //8、获取请求id
         long requetId = byteBuf.readLong();
+        // 9、时间戳
+        long timeStamp = byteBuf.readLong();
         //封装
         MyRpcResponse myRpcResponse = MyRpcResponse.builder()
                 .code(responseCode)
                 .serializeType(serializeType)
                 .compressType(compressType)
                 .requestId(requetId)
+                .timeStamp(timeStamp)
                 .build();
         //心跳请求直接返回
 //        if(responseCode == RequestType.HEART_BEAT.getId()){

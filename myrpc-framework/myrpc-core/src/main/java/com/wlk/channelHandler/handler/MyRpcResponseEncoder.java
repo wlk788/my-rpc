@@ -64,13 +64,21 @@ public class MyRpcResponseEncoder extends MessageToByteEncoder<MyRpcResponse> {
 
         // 8个字节的请求id
         byteBuf.writeLong(myRpcResponse.getRequestId());
+        byteBuf.writeLong(myRpcResponse.getTimeStamp());
         //序列化+压缩
-        //序列化
-        Serializer serializer = SerializerFactory.getSerializer(myRpcResponse.getSerializeType()).getSerializer();
-        byte[] body = serializer.serialize(myRpcResponse.getBody());
-        //压缩方式
-        Compressor compressor = CompressorFactory.getCompressor(myRpcResponse.getCompressType()).getCompressor();
-        body = compressor.compress(body);
+        // 1、对响应做序列化
+        byte[] body = null;
+        if(myRpcResponse.getBody() != null) {
+            Serializer serializer = SerializerFactory
+                    .getSerializer(myRpcResponse.getSerializeType()).getSerializer();
+            body = serializer.serialize(myRpcResponse.getBody());
+
+            // 2、压缩
+            Compressor compressor = CompressorFactory.getCompressor(
+                    myRpcResponse.getCompressType()
+            ).getCompressor();
+            body = compressor.compress(body);
+        }
         //写入请求体
         if(body != null){
             byteBuf.writeBytes(body);
@@ -79,7 +87,8 @@ public class MyRpcResponseEncoder extends MessageToByteEncoder<MyRpcResponse> {
 
         //回头写报文长度
         int writerIndex = byteBuf.writerIndex();
-        byteBuf.writerIndex(7);
+        byteBuf.writerIndex(MessageFormatConstant.MAGIC.length
+                + MessageFormatConstant.VERSION_LENGTH + MessageFormatConstant.HEADER_FIELD_LENGTH);
         byteBuf.writeInt(MessageFormatConstant.HEADER_LENGTH + bodyLength);
 
         byteBuf.writerIndex(writerIndex);

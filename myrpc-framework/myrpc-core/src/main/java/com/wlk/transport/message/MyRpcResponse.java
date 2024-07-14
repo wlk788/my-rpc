@@ -17,7 +17,7 @@ public class MyRpcResponse {
     private byte compressType;
     private byte serializeType;
 
-//    private long timeStamp;
+    private long timeStamp;
 
     // 1 成功，  2 异常
     private byte code;

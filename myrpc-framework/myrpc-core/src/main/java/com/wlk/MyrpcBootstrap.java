@@ -4,9 +4,14 @@ import com.wlk.channelHandler.handler.MethodCallHandler;
 import com.wlk.channelHandler.handler.MyRpcRequestDecoder;
 import com.wlk.channelHandler.handler.MyRpcResponseEncoder;
 import com.wlk.compress.CompressorFactory;
+import com.wlk.core.HeartbeatDetector;
 import com.wlk.discovery.Registry;
 import com.wlk.discovery.RegistryConfig;
+import com.wlk.loadbalancer.LoadBalancer;
+import com.wlk.loadbalancer.impl.ConsistentHashBalancer;
+import com.wlk.loadbalancer.impl.RoundRobinLoadBalancer;
 import com.wlk.serialize.SerializerFactory;
+import com.wlk.transport.message.MyRpcRequest;
 import com.wlk.utils.zookeeper.ZookeeperUtils;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
@@ -21,14 +26,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Id;
 
+import java.io.ObjectInputStream;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 public class MyrpcBootstrap {
+
     private static MyrpcBootstrap myrpcBootstrap = new MyrpcBootstrap();
 
     private String applicationName = "default";
@@ -38,8 +46,12 @@ public class MyrpcBootstrap {
     private Registry registry;
     private ZooKeeper zookeeper;
 
+    // 保存request对象，可以到当前线程中随时获取
+    public static final ThreadLocal<MyRpcRequest> REQUEST_THREAD_LOCAL = new ThreadLocal<>();
+
     // 连接的缓存,如果使用InetSocketAddress这样的类做key，一定要看他有没有重写equals方法和toString方法
     public final static Map<InetSocketAddress, Channel> CHANNEL_CACHE = new ConcurrentHashMap<>(16);
+    public final static TreeMap<Long, Channel> ANSWER_TIME_CHANNEL_CACHE = new TreeMap<>();
 
     // 维护已经发布且暴露的服务列表 key-> interface的全限定名  value -> ServiceConfig
     public final static Map<String, ServiceConfig<?>> SERVERS_LIST = new ConcurrentHashMap<>(16);
@@ -49,6 +61,8 @@ public class MyrpcBootstrap {
 
     //Id生成器
     public final static IdGenerator idGenerator = new IdGenerator(1, 2);
+
+    public static LoadBalancer loadBalancer;
 
     public static byte serializeType = (byte) 1;
     public static byte compressType = (byte) 1;
@@ -153,9 +167,12 @@ public class MyrpcBootstrap {
     }
 
     public MyrpcBootstrap reference(ReferenceConfig<?> reference) {
+        // 开启对这个服务的心跳检测
+        HeartbeatDetector.detectHeartbeat(reference.getInterface().getName());
         //在这个方法里我们是否可以拿到相关的配置项-注册中心
         // 配置reference，将来调用get方法时，方便生成代理对象
         reference.setRegistry(registry);
+        loadBalancer = new ConsistentHashBalancer();
         return this;
     }
 
@@ -187,4 +204,7 @@ public class MyrpcBootstrap {
         return this;
     }
 
+    public Registry getRegistry() {
+        return registry;
+    }
 }

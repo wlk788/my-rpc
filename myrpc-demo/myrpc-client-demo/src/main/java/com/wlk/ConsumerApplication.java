@@ -1,5 +1,6 @@
 package com.wlk;
 
+import com.wlk.core.HeartbeatDetector;
 import com.wlk.discovery.RegistryConfig;
 
 
@@ -22,6 +23,6 @@ public class ConsumerApplication {
                 .reference(reference);
         HelloMyrpc helloMyrpc = reference.get();
         helloMyrpc.sayHi("你好");
-
+//        HeartbeatDetector.detectHeartbeat(HelloMyrpc.class.getName());
     }
 }

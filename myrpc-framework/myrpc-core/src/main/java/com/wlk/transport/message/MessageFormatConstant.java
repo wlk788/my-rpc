@@ -18,7 +18,7 @@ import java.nio.charset.StandardCharsets;
 public class MessageFormatConstant {
     public final static byte[] MAGIC = "Mrpc".getBytes();
     public final static byte VERSION = 1;
-    public final static short HEADER_LENGTH = (short) (MAGIC.length + 1 + 2 + 4 + 1 + 1 + 1 + 8);
+    public final static short HEADER_LENGTH = (short) (MAGIC.length + 1 + 2 + 4 + 1 + 1 + 1 + 8 + 8);
 
     // 头部信息长度占用的字节数
     public static final int HEADER_FIELD_LENGTH = 2;

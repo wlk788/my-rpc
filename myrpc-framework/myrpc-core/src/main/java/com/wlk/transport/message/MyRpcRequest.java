@@ -9,7 +9,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-
 public class MyRpcRequest {
 
     //请求id
@@ -19,8 +18,8 @@ public class MyRpcRequest {
     private byte requestType;
     private byte compressType;
     private byte serializeType;
-//
-//    private long timeStamp;
+
+    private long timeStamp;
 
     //具体的消息体
     private RequestPayload requestPayload;

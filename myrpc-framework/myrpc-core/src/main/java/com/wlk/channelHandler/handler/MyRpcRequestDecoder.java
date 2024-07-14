@@ -37,7 +37,7 @@ public class MyRpcRequestDecoder extends LengthFieldBasedFrameDecoder {
 
     @Override
     protected Object decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
-//        Thread.sleep(new Random().nextInt(50));
+        Thread.sleep(new Random().nextInt(50));
 
         Object decode = super.decode(ctx, in);
         if(decode instanceof ByteBuf){
@@ -74,12 +74,15 @@ public class MyRpcRequestDecoder extends LengthFieldBasedFrameDecoder {
         byte compressType = byteBuf.readByte();
         //8、获取请求id
         long requetId = byteBuf.readLong();
+        // 9、时间戳
+        long timeStamp = byteBuf.readLong();
         //封装
         MyRpcRequest myRpcRequest = MyRpcRequest.builder()
                 .requestType(requestType)
                 .serializeType(serializeType)
                 .compressType(compressType)
                 .requestId(requetId)
+                .timeStamp(timeStamp)
                 .build();
         //心跳请求直接返回
         if(requestType == RequestType.HEART_BEAT.getId()){

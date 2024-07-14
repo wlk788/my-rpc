@@ -44,17 +44,35 @@ public class RpcConsumerInvocationHandler implements InvocationHandler {
         /*
          * ------------------ 1、封装报文 ---------------------------
          */
+
+        //TODO 封装报文
+        RequestPayload requestPayload = RequestPayload.builder()
+                .interfaceName(interfaceRef.getName())
+                .methodName(method.getName())
+                .parametersType(method.getParameterTypes())
+                .parametersValue(args)
+                .returnType(method.getReturnType())
+                .build();
+        MyRpcRequest myRpcRequest = MyRpcRequest.builder()
+                .requestId(MyrpcBootstrap.idGenerator.getId())
+                .compressType(MyrpcBootstrap.compressType)
+                .serializeType(MyrpcBootstrap.serializeType)
+                .requestType(RequestType.REQUEST.getId())
+                .timeStamp(System.currentTimeMillis())
+                .requestPayload(requestPayload)
+                .build();
         /*
          * ------------------ 2、将请求存入本地线程，需要在合适的时候remove ---------------------------
          */
+        //存入threadLoacl
+        MyrpcBootstrap.REQUEST_THREAD_LOCAL.set(myRpcRequest);
         /*
          * ------------------ 3、发现服务，从注册中心拉取服务列表，并通过客户端负载均衡寻找一个可用的服务 ---------------------------
          */
         System.out.println("hello proxy");
-        List<InetSocketAddress> addresses = registry.lookup(interfaceRef.getName(), group);
 
-        //TODO 处理连接列表，可能使用负载均衡
-        InetSocketAddress address = addresses.get(0);
+        //TODO 继续掉更负载均衡代码
+        InetSocketAddress address = MyrpcBootstrap.loadBalancer.selectServiceAddress(interfaceRef.getName());
         if(log.isDebugEnabled()){
             log.debug("服务调用方，发现了服务【{}】的可用主机【{}】", interfaceRef.getName(), address);
         }
@@ -73,23 +91,8 @@ public class RpcConsumerInvocationHandler implements InvocationHandler {
         CompletableFuture<Object> completableFuture = new CompletableFuture<>();
 
         //TODO 将CompletableFuture暴露出去
-        PENDING_REQUEST.put(1L, completableFuture);
+        PENDING_REQUEST.put(myRpcRequest.getRequestId(), completableFuture);
 
-        //TODO 封装报文
-        RequestPayload requestPayload = RequestPayload.builder()
-                .interfaceName(interfaceRef.getName())
-                .methodName(method.getName())
-                .parametersType(method.getParameterTypes())
-                .parametersValue(args)
-                .returnType(method.getReturnType())
-                .build();
-        MyRpcRequest myRpcRequest = MyRpcRequest.builder()
-                .requestId(MyrpcBootstrap.idGenerator.getId())
-                .compressType(MyrpcBootstrap.compressType)
-                .serializeType(MyrpcBootstrap.serializeType)
-                .requestType(RequestType.REQUEST.getId())
-                .requestPayload(requestPayload)
-                .build();
         //写出
         channel.writeAndFlush(myRpcRequest).addListener(
                 (ChannelFutureListener)promise ->{
@@ -98,7 +101,8 @@ public class RpcConsumerInvocationHandler implements InvocationHandler {
                         completableFuture.completeExceptionally(promise.cause());
                     }
                 });
-
+        //清除ThreadLocal
+        MyrpcBootstrap.REQUEST_THREAD_LOCAL.remove();
         return completableFuture.get(3, TimeUnit.SECONDS);
     }
 
