@@ -23,7 +23,7 @@ import java.util.concurrent.TimeoutException;
 public class HeartbeatDetector {
 
     public static void detectHeartbeat(String serviceName){
-        Registry registry = MyrpcBootstrap.getInstance().getRegistry();
+        Registry registry = MyrpcBootstrap.getInstance().getConfiguration().getRegistryConfig().getRegistry();
         List<InetSocketAddress> addresses = registry.lookup(serviceName);
 
         for (InetSocketAddress address : addresses) {
@@ -56,10 +56,10 @@ public class HeartbeatDetector {
                     long start = System.currentTimeMillis();
 
                     MyRpcRequest myRpcRequest = MyRpcRequest.builder()
-                            .requestId(MyrpcBootstrap.idGenerator.getId())
-                            .compressType(CompressorFactory.getCompressor(MyrpcBootstrap.compressType).getCode())
+                            .requestId(MyrpcBootstrap.getInstance().getConfiguration().idGenerator.getId())
+                            .compressType(CompressorFactory.getCompressor(MyrpcBootstrap.getInstance().getConfiguration().getCompressType()).getCode())
                             .requestType(RequestType.HEART_BEAT.getId())
-                            .serializeType(SerializerFactory.getSerializer(MyrpcBootstrap.serializeType).getCode())
+                            .serializeType(SerializerFactory.getSerializer(MyrpcBootstrap.getInstance().getConfiguration().getSerializeType()).getCode())
                             .timeStamp(start)
                             .build();
 

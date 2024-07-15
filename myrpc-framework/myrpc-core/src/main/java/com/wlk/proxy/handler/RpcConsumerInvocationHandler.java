@@ -54,9 +54,9 @@ public class RpcConsumerInvocationHandler implements InvocationHandler {
                 .returnType(method.getReturnType())
                 .build();
         MyRpcRequest myRpcRequest = MyRpcRequest.builder()
-                .requestId(MyrpcBootstrap.idGenerator.getId())
-                .compressType(MyrpcBootstrap.compressType)
-                .serializeType(MyrpcBootstrap.serializeType)
+                .requestId(MyrpcBootstrap.getInstance().getConfiguration().idGenerator.getId())
+                .compressType(MyrpcBootstrap.getInstance().getConfiguration().getCompressType())
+                .serializeType(MyrpcBootstrap.getInstance().getConfiguration().getSerializeType())
                 .requestType(RequestType.REQUEST.getId())
                 .timeStamp(System.currentTimeMillis())
                 .requestPayload(requestPayload)
@@ -72,7 +72,7 @@ public class RpcConsumerInvocationHandler implements InvocationHandler {
         System.out.println("hello proxy");
 
         //负载均衡代码
-        InetSocketAddress address = MyrpcBootstrap.loadBalancer.selectServiceAddress(interfaceRef.getName());
+        InetSocketAddress address = MyrpcBootstrap.getInstance().getConfiguration().getLoadBalancer().selectServiceAddress(interfaceRef.getName());
         if(log.isDebugEnabled()){
             log.debug("服务调用方，发现了服务【{}】的可用主机【{}】", interfaceRef.getName(), address);
         }

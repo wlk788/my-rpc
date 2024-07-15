@@ -21,7 +21,7 @@ public class UpAndDownWatcher implements Watcher {
                 log.debug("检测到服务【{}】有节点上下线，将重新拉取服务列表", watchedEvent.getPath());
             }
             String serviceName = getServiceName(watchedEvent.getPath());
-            Registry registry = MyrpcBootstrap.getInstance().getRegistry();
+            Registry registry = MyrpcBootstrap.getInstance().getConfiguration().getRegistryConfig().getRegistry();
             List<InetSocketAddress> addresses = registry.lookup(serviceName);
 
             for (InetSocketAddress address : addresses) {
@@ -43,7 +43,7 @@ public class UpAndDownWatcher implements Watcher {
             }
 
             // TODO 获得负载均衡器，进行重新的loadBalance
-            MyrpcBootstrap.loadBalancer.reLoadBalance(serviceName, addresses);
+            MyrpcBootstrap.getInstance().getConfiguration().getLoadBalancer().reLoadBalance(serviceName, addresses);
         }
     }
 

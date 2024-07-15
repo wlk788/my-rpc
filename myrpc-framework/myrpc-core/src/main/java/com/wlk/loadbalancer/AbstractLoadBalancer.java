@@ -18,7 +18,7 @@ public abstract class AbstractLoadBalancer implements LoadBalancer{
 
         //2 如果没有则创建一个
         if (selector == null){
-            List<InetSocketAddress> serviceList = MyrpcBootstrap.getInstance().getRegistry().lookup(serviceName);
+            List<InetSocketAddress> serviceList = MyrpcBootstrap.getInstance().getConfiguration().getRegistryConfig().getRegistry().lookup(serviceName);
 
             selector = getSelector(serviceList);
 

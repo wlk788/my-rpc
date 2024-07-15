@@ -1,15 +1,16 @@
 package com.wlk;
 
+import com.wlk.annotation.MyrpcApi;
 import com.wlk.channelHandler.handler.MethodCallHandler;
 import com.wlk.channelHandler.handler.MyRpcRequestDecoder;
 import com.wlk.channelHandler.handler.MyRpcResponseEncoder;
 import com.wlk.compress.CompressorFactory;
+import com.wlk.config.Configuration;
 import com.wlk.core.HeartbeatDetector;
 import com.wlk.discovery.Registry;
 import com.wlk.discovery.RegistryConfig;
 import com.wlk.loadbalancer.LoadBalancer;
 import com.wlk.loadbalancer.impl.ConsistentHashBalancer;
-import com.wlk.loadbalancer.impl.RoundRobinLoadBalancer;
 import com.wlk.serialize.SerializerFactory;
 import com.wlk.transport.message.MyRpcRequest;
 import com.wlk.utils.zookeeper.ZookeeperUtils;
@@ -24,28 +25,25 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.logging.LoggingHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.data.Id;
 
-import java.io.ObjectInputStream;
+import java.io.File;
+import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
+import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Slf4j
 public class MyrpcBootstrap {
 
-    private static MyrpcBootstrap myrpcBootstrap = new MyrpcBootstrap();
+    private static final MyrpcBootstrap myrpcBootstrap = new MyrpcBootstrap();
 
-    private String applicationName = "default";
-    private RegistryConfig registryConfig;
-    private ProtocolConfig protocolConfig;
-
-    private Registry registry;
-    private ZooKeeper zookeeper;
-
+    private final Configuration configuration;
     // 保存request对象，可以到当前线程中随时获取
     public static final ThreadLocal<MyRpcRequest> REQUEST_THREAD_LOCAL = new ThreadLocal<>();
 
@@ -59,16 +57,9 @@ public class MyrpcBootstrap {
     // 定义全局的对外挂起的 completableFuture
     public final static Map<Long, CompletableFuture<Object>> PENDING_REQUEST = new ConcurrentHashMap<>(128);
 
-    //Id生成器
-    public final static IdGenerator idGenerator = new IdGenerator(1, 2);
-
-    public static LoadBalancer loadBalancer;
-
-    public static byte serializeType = (byte) 1;
-    public static byte compressType = (byte) 1;
 
     public MyrpcBootstrap() {
-        zookeeper = ZookeeperUtils.createZookeeper();
+        configuration = new Configuration();
     }
 
     public static MyrpcBootstrap getInstance(){
@@ -85,28 +76,23 @@ public class MyrpcBootstrap {
      * @return
      */
     public MyrpcBootstrap registry(RegistryConfig registryConfig){
-        this.registryConfig = registryConfig;
-        this.registry = registryConfig.getRegistry();
+        configuration.setRegistryConfig(registryConfig);
         return this;
     }
 
-    /**
-     * 序列化协议
-     * @param protocolConfig
-     * @return
-     */
-    public MyrpcBootstrap protocol(ProtocolConfig protocolConfig){
+    public MyrpcBootstrap loadBalancer(LoadBalancer loadBalancer) {
+        configuration.setLoadBalancer(loadBalancer);
         return this;
     }
 
     /**
      * 封装需要发布的服务
-     * @param service
+     * @param serviceConfig
      * @return
      */
-    public MyrpcBootstrap publish(ServiceConfig<?> service) {
-        registry.registry(service);
-        SERVERS_LIST.put(service.getInterface().getName(), service);
+    public MyrpcBootstrap publish(ServiceConfig<?> serviceConfig) {
+        configuration.getRegistryConfig().getRegistry().registry(serviceConfig);
+        SERVERS_LIST.put(serviceConfig.getInterface().getName(), serviceConfig);
         return this;
     }
 
@@ -171,8 +157,8 @@ public class MyrpcBootstrap {
         HeartbeatDetector.detectHeartbeat(reference.getInterface().getName());
         //在这个方法里我们是否可以拿到相关的配置项-注册中心
         // 配置reference，将来调用get方法时，方便生成代理对象
-        reference.setRegistry(registry);
-        loadBalancer = new ConsistentHashBalancer();
+        reference.setRegistry(configuration.getRegistryConfig().getRegistry());
+//        reference.setGroup(this.getConfiguration().getGroup());
         return this;
     }
 
@@ -183,9 +169,9 @@ public class MyrpcBootstrap {
     }
 
     public MyrpcBootstrap serialize(byte serialize){
-        serializeType = serialize;
+        configuration.setSerializeType(serialize);
         if (log.isDebugEnabled()){
-            log.debug("我们配置了使用的序列化的方式为【{}】.", serializeType);
+            log.debug("我们配置了使用的序列化的方式为【{}】.", serialize);
         }
         return this;
     }
@@ -197,14 +183,96 @@ public class MyrpcBootstrap {
     }
 
     public MyrpcBootstrap compress(byte compress){
-        compressType = compress;
+        configuration.setCompressType(compress);
         if (log.isDebugEnabled()){
-            log.debug("我们配置了使用的压缩的方式为【{}】.", serializeType);
+            log.debug("我们配置了使用的压缩的方式为【{}】.", compress);
         }
         return this;
     }
 
-    public Registry getRegistry() {
-        return registry;
+    public MyrpcBootstrap scan(String packageName){
+        List<String> classNames = getAllClassNames(packageName);
+        //反射获取接口
+        List<Class<?>> classes = classNames.stream().map(className -> {
+                    try {
+                        return Class.forName(className);
+                    } catch (ClassNotFoundException e) {
+                        throw new RuntimeException(e);
+                    }
+                }).filter(clazz -> clazz.getAnnotation(MyrpcApi.class) != null)
+                .collect(Collectors.toList());
+
+        for (Class<?> clazz : classes) {
+            Class<?>[] interfaces = clazz.getInterfaces();
+            Object instance = null;
+            try {
+                instance = clazz.getConstructor().newInstance();
+            } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                throw new RuntimeException(e);
+            }
+
+            MyrpcApi myrpcApi = clazz.getAnnotation(MyrpcApi.class);
+            String group = myrpcApi.group();
+
+            for (Class<?> anInterface : interfaces) {
+                ServiceConfig<?> serviceConfig = new ServiceConfig<>();
+                serviceConfig.setInterface(anInterface);
+                serviceConfig.setRef(instance);
+                if (log.isDebugEnabled()){
+                    log.debug("---->已经通过包扫描，将服务【{}】发布.",anInterface);
+                }
+                // 3、发布
+                publish(serviceConfig);
+            }
+        }
+
+
+        return this;
+    }
+
+    private List<String> getAllClassNames(String packageName) {
+        String basePath = packageName.replaceAll("\\.", "/");
+        URL url = ClassLoader.getSystemClassLoader().getResource(basePath);
+        if (url == null){
+            throw new RuntimeException("包扫描时，发现路径不存在.");
+        }
+        String absolutePath = url.getPath();
+        List<String> classNames = new ArrayList<>();
+        classNames = recursionFile(absolutePath,classNames,basePath);
+        return classNames;
+    }
+
+    private List<String> recursionFile(String absolutePath, List<String> classNames, String basePath) {
+        File file = new File(absolutePath);
+        if (file.isDirectory()){
+            File[] files = file.listFiles(pathname -> pathname.isDirectory() || pathname.getPath().contains(".class"));
+            for (File child : files) {
+                if (child.isDirectory()){
+                    recursionFile(child.getAbsolutePath(), classNames, basePath);
+                }
+                else {
+                    String className = getClassNameByAbsolutePath(child.getAbsolutePath(), basePath);
+                    classNames.add(className);
+                }
+            }
+        }
+        else {
+            String className = getClassNameByAbsolutePath(absolutePath, basePath);
+            classNames.add(className);
+        }
+        return classNames;
+    }
+
+    private String getClassNameByAbsolutePath(String absolutePath, String basePath) {
+        String fileName = absolutePath.substring(absolutePath.indexOf(basePath.replaceAll("/", "\\\\"))).replaceAll("\\\\", ".");
+        return fileName.substring(0, fileName.indexOf(".class"));
+    }
+
+    public Configuration getConfiguration() {
+        return configuration;
+    }
+
+    public static void main(String[] args) {
+        MyrpcBootstrap.getInstance().getAllClassNames("com.wlk");
     }
 }
