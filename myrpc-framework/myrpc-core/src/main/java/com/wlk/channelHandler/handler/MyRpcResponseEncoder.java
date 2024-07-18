@@ -70,13 +70,13 @@ public class MyRpcResponseEncoder extends MessageToByteEncoder<MyRpcResponse> {
         byte[] body = null;
         if(myRpcResponse.getBody() != null) {
             Serializer serializer = SerializerFactory
-                    .getSerializer(myRpcResponse.getSerializeType()).getSerializer();
+                    .getSerializer(myRpcResponse.getSerializeType()).getImpl();
             body = serializer.serialize(myRpcResponse.getBody());
 
             // 2、压缩
             Compressor compressor = CompressorFactory.getCompressor(
                     myRpcResponse.getCompressType()
-            ).getCompressor();
+            ).getImpl();
             body = compressor.compress(body);
         }
         //写入请求体

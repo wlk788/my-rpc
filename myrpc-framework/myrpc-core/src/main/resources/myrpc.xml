@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration SYSTEM "http://wlk.com/myrpc-config.dtd">
+<configuration>
+
+    <port>8094</port>
+    <appName>yrpc-default-appName</appName>
+    <registry url="zookeeper://127.0.0.1:2181"/>
+
+    <!-- 二选一 -->
+    <serializeType type="hessian"/>
+    <serializer code="1" name="jdk" class="com.wlk.serialize.impl.HessianSerializer"/>
+
+    <!-- 二选一 -->
+    <compressType type="gzip"/>
+    <compressor code="1" name="gzip"  class="com.wlk.compress.impl.GzipCompressor"/>
+
+    <!-- 二选一 -->
+    <loadBalancer class="com.wlk.loadbalancer.impl.MinimumResponseTimeLoadBalancer"/>
+    <loadBalancerType type="minimumResponseTime"/>
+
+    <idGenerator class="com.wlk.IdGenerator" dataCenterId="2" MachineId="4"/>
+
+</configuration>

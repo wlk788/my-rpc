@@ -22,7 +22,8 @@ public class ConsumerApplication {
                 .compress("gzip")
                 .reference(reference);
         HelloMyrpc helloMyrpc = reference.get();
-        helloMyrpc.sayHi("你好");
+        String s = helloMyrpc.sayHi("你好");
+        System.out.println(s);
 //        HeartbeatDetector.detectHeartbeat(HelloMyrpc.class.getName());
     }
 }
