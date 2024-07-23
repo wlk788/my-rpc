@@ -137,7 +137,7 @@ public class MyrpcBootstrap {
                     });
 
             // 4、绑定端口
-            ChannelFuture channelFuture = serverBootstrap.bind(8088).sync();
+            ChannelFuture channelFuture = serverBootstrap.bind(this.getConfiguration().getPort()).sync();
 
             channelFuture.channel().closeFuture().sync();
         } catch (InterruptedException e) {

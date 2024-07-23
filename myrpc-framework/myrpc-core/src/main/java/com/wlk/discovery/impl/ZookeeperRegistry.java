@@ -22,7 +22,6 @@ public class ZookeeperRegistry implements Registry {
 
     // 维护一个zk实例
     private ZooKeeper zooKeeper;
-    private int port = 8088;
 
     public ZookeeperRegistry() {
         this.zooKeeper = ZookeeperUtils.createZookeeper();
@@ -40,7 +39,7 @@ public class ZookeeperRegistry implements Registry {
             ZookeeperUtils.createNode(zooKeeper, zookeeperNode, null, CreateMode.PERSISTENT);
         }
         // 建立分组节点
-        parentNode = parentNode + "/" + serviceConfig .getGroup();
+        parentNode = parentNode + "/" + serviceConfig.getGroup();
         if(!ZookeeperUtils.exists(zooKeeper,parentNode,null)){
             ZookeeperNode zookeeperNode = new ZookeeperNode(parentNode,null);
             ZookeeperUtils.createNode(zooKeeper, zookeeperNode, null, CreateMode.PERSISTENT);
