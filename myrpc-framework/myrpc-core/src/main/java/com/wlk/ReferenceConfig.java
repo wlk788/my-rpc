@@ -12,7 +12,7 @@ public class ReferenceConfig<T> {
     private Registry registry;
 
     // 分组信息
-    private String group = "115.156.214.170:8088";
+    private String group;
 
     public ReferenceConfig() {
     }
@@ -53,6 +53,14 @@ public class ReferenceConfig<T> {
 
     public void setRegistry(Registry registry) {
         this.registry = registry;
+    }
+
+    public void setGroup(String group) {
+        this.group = group;
+    }
+
+    public String getGroup() {
+        return group;
     }
 
 }

@@ -39,8 +39,14 @@ public class ZookeeperRegistry implements Registry {
             ZookeeperNode zookeeperNode = new ZookeeperNode(parentNode, null);
             ZookeeperUtils.createNode(zooKeeper, zookeeperNode, null, CreateMode.PERSISTENT);
         }
-        //todo: 后续处理端口的问题
-        String hostNode = parentNode + "/" + NetUtils.getIp() + ":" + port;
+        // 建立分组节点
+        parentNode = parentNode + "/" + serviceConfig .getGroup();
+        if(!ZookeeperUtils.exists(zooKeeper,parentNode,null)){
+            ZookeeperNode zookeeperNode = new ZookeeperNode(parentNode,null);
+            ZookeeperUtils.createNode(zooKeeper, zookeeperNode, null, CreateMode.PERSISTENT);
+        }
+        //处理端口的问题
+        String hostNode = parentNode + "/" + NetUtils.getIp() + ":" + MyrpcBootstrap.getInstance().getConfiguration().getPort();
         if(!ZookeeperUtils.exists(zooKeeper, hostNode, null)){
             ZookeeperNode zookeeperNode = new ZookeeperNode(hostNode, null);
             ZookeeperUtils.createNode(zooKeeper, zookeeperNode, null, CreateMode.EPHEMERAL);
@@ -51,10 +57,10 @@ public class ZookeeperRegistry implements Registry {
     }
 
     @Override
-    public List<InetSocketAddress> lookup(String serviceName) {
+    public List<InetSocketAddress> lookup(String serviceName, String group) {
         //1、找到服务的节点
-//        String serviceNode = Constant.BASE_PROVIDERS_PATH + "/" + serviceName + "/" + group;
-        String serviceNode = Constant.BASE_PROVIDERS_PATH + "/" + serviceName;
+        String serviceNode = Constant.BASE_PROVIDERS_PATH + "/" + serviceName + "/" + group;
+//        String serviceNode = Constant.BASE_PROVIDERS_PATH + "/" + serviceName;
         //2、找到子节点
         List<String> children = ZookeeperUtils.getChildren(zooKeeper, serviceNode, new UpAndDownWatcher());
         // 获取了所有可用的列表

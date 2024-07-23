@@ -24,7 +24,7 @@ public class HeartbeatDetector {
 
     public static void detectHeartbeat(String serviceName){
         Registry registry = MyrpcBootstrap.getInstance().getConfiguration().getRegistryConfig().getRegistry();
-        List<InetSocketAddress> addresses = registry.lookup(serviceName);
+        List<InetSocketAddress> addresses = registry.lookup(serviceName, MyrpcBootstrap.getInstance().getConfiguration().getGroup());
 
         for (InetSocketAddress address : addresses) {
             try {

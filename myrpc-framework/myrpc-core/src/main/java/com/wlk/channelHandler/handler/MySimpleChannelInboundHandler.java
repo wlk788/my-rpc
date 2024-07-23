@@ -4,6 +4,7 @@ import com.wlk.MyrpcBootstrap;
 import com.wlk.enumeration.RespCode;
 import com.wlk.exceptions.ResponseException;
 import com.wlk.loadbalancer.LoadBalancer;
+import com.wlk.protection.CircuitBreaker;
 import com.wlk.transport.message.MyRpcRequest;
 import com.wlk.transport.message.MyRpcResponse;
 import io.netty.buffer.ByteBuf;
@@ -13,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.net.SocketAddress;
 import java.nio.charset.Charset;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 @Slf4j
@@ -23,27 +25,27 @@ public class MySimpleChannelInboundHandler extends SimpleChannelInboundHandler<M
         CompletableFuture<Object> completableFuture = MyrpcBootstrap.PENDING_REQUEST.get(myRpcResponse.getRequestId());
 
         SocketAddress socketAddress = channelHandlerContext.channel().remoteAddress();
-//        Map<SocketAddress, CircuitBreaker> everyIpCircuitBreaker = YrpcBootstrap.getInstance()
-//                .getConfiguration().getEveryIpCircuitBreaker();
-//        CircuitBreaker circuitBreaker = everyIpCircuitBreaker.get(socketAddress);
+        Map<SocketAddress, CircuitBreaker> everyIpCircuitBreaker = MyrpcBootstrap.getInstance()
+                .getConfiguration().getEveryIpCircuitBreaker();
+        CircuitBreaker circuitBreaker = everyIpCircuitBreaker.get(socketAddress);
 
         byte code = myRpcResponse.getCode();
         if(code == RespCode.FAIL.getCode()){
-//            circuitBreaker.recordErrorRequest();
+            circuitBreaker.recordErrorRequest();
             completableFuture.complete(null);
             log.error("当前id为[{}]的请求，返回错误的结果，响应码[{}].",
                     myRpcResponse.getRequestId(),myRpcResponse.getCode());
             throw new ResponseException(code,RespCode.FAIL.getDesc());
 
         } else if (code == RespCode.RATE_LIMIT.getCode()){
-//            circuitBreaker.recordErrorRequest();
+            circuitBreaker.recordErrorRequest();
             completableFuture.complete(null);
             log.error("当前id为[{}]的请求，被限流，响应码[{}].",
                     myRpcResponse.getRequestId(),myRpcResponse.getCode());
             throw new ResponseException(code,RespCode.RATE_LIMIT.getDesc());
 
         } else if (code == RespCode.RESOURCE_NOT_FOUND.getCode() ){
-//            circuitBreaker.recordErrorRequest();
+            circuitBreaker.recordErrorRequest();
             completableFuture.complete(null);
             log.error("当前id为[{}]的请求，未找到目标资源，响应码[{}].",
                     myRpcResponse.getRequestId(),myRpcResponse.getCode());
@@ -72,12 +74,12 @@ public class MySimpleChannelInboundHandler extends SimpleChannelInboundHandler<M
             // 从健康列表中移除
             MyrpcBootstrap.CHANNEL_CACHE.remove(socketAddress);
             // reLoadBalance
-//            LoadBalancer loadBalancer = MyrpcBootstrap.getInstance()
-//                    .getConfiguration().getLoadBalancer();
-//            // 重新进行负载均衡
-//            MyRpcRequest yrpcRequest = MyrpcBootstrap.REQUEST_THREAD_LOCAL.get();
-//            loadBalancer.reLoadBalance(yrpcRequest.getRequestPayload().getInterfaceName()
-//                    ,YrpcBootstrap.CHANNEL_CACHE.keySet().stream().toList());
+            LoadBalancer loadBalancer = MyrpcBootstrap.getInstance()
+                    .getConfiguration().getLoadBalancer();
+            // 重新进行负载均衡
+            MyRpcRequest yrpcRequest = MyrpcBootstrap.REQUEST_THREAD_LOCAL.get();
+            loadBalancer.reLoadBalance(yrpcRequest.getRequestPayload().getInterfaceName()
+                    ,MyrpcBootstrap.CHANNEL_CACHE.keySet().stream().toList());
 
             throw new ResponseException(code,RespCode.BECOLSING.getDesc());
         }

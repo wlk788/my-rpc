@@ -6,6 +6,7 @@ import com.wlk.NettyBootstrapInitializer;
 import com.wlk.discovery.Registry;
 import com.wlk.enumeration.RequestType;
 import com.wlk.exceptions.DiscoveryException;
+import com.wlk.protection.CircuitBreaker;
 import com.wlk.transport.message.MyRpcRequest;
 import com.wlk.transport.message.RequestPayload;
 import io.netty.buffer.Unpooled;
@@ -16,8 +17,12 @@ import lombok.extern.slf4j.Slf4j;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -41,69 +46,124 @@ public class RpcConsumerInvocationHandler implements InvocationHandler {
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        // 从接口中获取判断是否需要重试
+//        TryTimes tryTimesAnnotation = method.getAnnotation(TryTimes.class);
+        // 默认值0,代表不重试
+        int tryTimes = 0;
+        int intervalTime = 0;
+//        if (tryTimesAnnotation != null) {
+//            tryTimes = tryTimesAnnotation.tryTimes();
+//            intervalTime = tryTimesAnnotation.intervalTime();
+//        }
+
         /*
          * ------------------ 1、封装报文 ---------------------------
          */
 
-        //TODO 封装报文
-        RequestPayload requestPayload = RequestPayload.builder()
-                .interfaceName(interfaceRef.getName())
-                .methodName(method.getName())
-                .parametersType(method.getParameterTypes())
-                .parametersValue(args)
-                .returnType(method.getReturnType())
-                .build();
-        MyRpcRequest myRpcRequest = MyRpcRequest.builder()
-                .requestId(MyrpcBootstrap.getInstance().getConfiguration().idGenerator.getId())
-                .compressType(MyrpcBootstrap.getInstance().getConfiguration().getCompressType())
-                .serializeType(MyrpcBootstrap.getInstance().getConfiguration().getSerializeType())
-                .requestType(RequestType.REQUEST.getId())
-                .timeStamp(System.currentTimeMillis())
-                .requestPayload(requestPayload)
-                .build();
-        /*
-         * ------------------ 2、将请求存入本地线程，需要在合适的时候remove ---------------------------
-         */
-        //存入threadLoacl
-        MyrpcBootstrap.REQUEST_THREAD_LOCAL.set(myRpcRequest);
-        /*
-         * ------------------ 3、发现服务，从注册中心拉取服务列表，并通过客户端负载均衡寻找一个可用的服务 ---------------------------
-         */
-        System.out.println("hello proxy");
+        while (true) {
+            RequestPayload requestPayload = RequestPayload.builder()
+                    .interfaceName(interfaceRef.getName())
+                    .methodName(method.getName())
+                    .parametersType(method.getParameterTypes())
+                    .parametersValue(args)
+                    .returnType(method.getReturnType())
+                    .build();
+            MyRpcRequest myRpcRequest = MyRpcRequest.builder()
+                    .requestId(MyrpcBootstrap.getInstance().getConfiguration().idGenerator.getId())
+                    .compressType(MyrpcBootstrap.getInstance().getConfiguration().getCompressType())
+                    .serializeType(MyrpcBootstrap.getInstance().getConfiguration().getSerializeType())
+                    .requestType(RequestType.REQUEST.getId())
+                    .timeStamp(System.currentTimeMillis())
+                    .requestPayload(requestPayload)
+                    .build();
+            /*
+             * ------------------ 2、将请求存入本地线程，需要在合适的时候remove ---------------------------
+             */
+            //存入threadLoacl
+            MyrpcBootstrap.REQUEST_THREAD_LOCAL.set(myRpcRequest);
+            /*
+             * ------------------ 3、发现服务，从注册中心拉取服务列表，并通过客户端负载均衡寻找一个可用的服务 ---------------------------
+             */
+            System.out.println("hello proxy");
 
-        //负载均衡代码
-        InetSocketAddress address = MyrpcBootstrap.getInstance().getConfiguration().getLoadBalancer().selectServiceAddress(interfaceRef.getName());
-        if(log.isDebugEnabled()){
-            log.debug("服务调用方，发现了服务【{}】的可用主机【{}】", interfaceRef.getName(), address);
+            //负载均衡代码
+            InetSocketAddress address = MyrpcBootstrap.getInstance().getConfiguration().getLoadBalancer().selectServiceAddress(interfaceRef.getName(), group);
+            if(log.isDebugEnabled()){
+                log.debug("服务调用方，发现了服务【{}】的可用主机【{}】", interfaceRef.getName(), address);
+            }
+            /*
+             * ------------------ 4、获取当前地址所对应的断路器，如果断路器是打开的则不发送请求，抛出异常 ---------------------------
+             */
+            Map<SocketAddress, CircuitBreaker> everyIpCircuitBreaker = MyrpcBootstrap.getInstance()
+                    .getConfiguration().getEveryIpCircuitBreaker();
+            CircuitBreaker circuitBreaker = everyIpCircuitBreaker.get(address);
+            if (circuitBreaker == null) {
+                circuitBreaker = new CircuitBreaker(10, 0.5F);
+                everyIpCircuitBreaker.put(address, circuitBreaker);
+            }
+            try {
+                // 如果断路器是打开的
+                if (myRpcRequest.getRequestType() != RequestType.HEART_BEAT.getId() && circuitBreaker.isBreak()) {
+                    // 定期打开
+                    Timer timer = new Timer();
+                    timer.schedule(new TimerTask() {
+                        @Override
+                        public void run() {
+                            MyrpcBootstrap.getInstance()
+                                    .getConfiguration().getEveryIpCircuitBreaker()
+                                    .get(address).reset();
+                        }
+                    }, 5000);
+
+                    throw new RuntimeException("当前断路器已经开启，无法发送请求");
+                }
+                /*
+                 * ------------------ 5、尝试获取一个可用通道 ---------------------------
+                 */
+                Channel channel = getAvaiableChannel(address);
+
+                /*
+                 * ------------------ 6、写出报文 ---------------------------
+                 */
+                //使用异步策略获取结果
+                CompletableFuture<Object> completableFuture = new CompletableFuture<>();
+
+                //TODO 将CompletableFuture暴露出去
+                PENDING_REQUEST.put(myRpcRequest.getRequestId(), completableFuture);
+
+                //写出
+                channel.writeAndFlush(myRpcRequest).addListener(
+                        (ChannelFutureListener)promise ->{
+                            // 只需要处理以下异常就行了
+                            if (!promise.isSuccess()) {
+                                completableFuture.completeExceptionally(promise.cause());
+                            }
+                        });
+                //清除ThreadLocal
+                MyrpcBootstrap.REQUEST_THREAD_LOCAL.remove();
+                Object result = completableFuture.get(10, TimeUnit.SECONDS);
+                // 记录成功的请求
+                circuitBreaker.recordRequest();
+                return result;
+            } catch (Exception e) {
+                // 次数减一，并且等待固定时间，固定时间有一定的问题，重试风暴
+                tryTimes--;
+                // 记录错误的次数
+                circuitBreaker.recordErrorRequest();
+                try {
+                    Thread.sleep(intervalTime);
+                } catch (InterruptedException ex) {
+                    log.error("在进行重试时发生异常.", ex);
+                }
+                if (tryTimes < 0) {
+                    log.error("对方法【{}】进行远程调用时，重试{}次，依然不可调用",
+                            method.getName(), tryTimes, e);
+                    break;
+                }
+                log.error("在进行第{}次重试时发生异常.", 3 - tryTimes, e);
+            }
         }
-        /*
-         * ------------------ 4、获取当前地址所对应的断路器，如果断路器是打开的则不发送请求，抛出异常 ---------------------------
-         */
-        /*
-         * ------------------ 5、尝试获取一个可用通道 ---------------------------
-         */
-        Channel channel = getAvaiableChannel(address);
-
-        /*
-         * ------------------ 6、写出报文 ---------------------------
-         */
-        //使用异步策略获取结果
-        CompletableFuture<Object> completableFuture = new CompletableFuture<>();
-
-        //TODO 将CompletableFuture暴露出去
-        PENDING_REQUEST.put(myRpcRequest.getRequestId(), completableFuture);
-
-        //写出
-        channel.writeAndFlush(myRpcRequest).addListener(
-                (ChannelFutureListener)promise ->{
-                    // 只需要处理以下异常就行了
-                    if (!promise.isSuccess()) {
-                        completableFuture.completeExceptionally(promise.cause());
-                    }
-                });
-        //清除ThreadLocal
-        MyrpcBootstrap.REQUEST_THREAD_LOCAL.remove();
-        return completableFuture.get(3, TimeUnit.SECONDS);
+        throw new RuntimeException("执行远程方法" + method.getName() + "调用失败。");
     }
 
     private Channel getAvaiableChannel(InetSocketAddress address) {

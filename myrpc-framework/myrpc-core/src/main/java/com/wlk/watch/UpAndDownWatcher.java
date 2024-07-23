@@ -22,7 +22,7 @@ public class UpAndDownWatcher implements Watcher {
             }
             String serviceName = getServiceName(watchedEvent.getPath());
             Registry registry = MyrpcBootstrap.getInstance().getConfiguration().getRegistryConfig().getRegistry();
-            List<InetSocketAddress> addresses = registry.lookup(serviceName);
+            List<InetSocketAddress> addresses = registry.lookup(serviceName, MyrpcBootstrap.getInstance().getConfiguration().getGroup());
 
             for (InetSocketAddress address : addresses) {
                 if (!MyrpcBootstrap.CHANNEL_CACHE.containsKey(address)){
@@ -42,7 +42,7 @@ public class UpAndDownWatcher implements Watcher {
                 }
             }
 
-            // TODO 获得负载均衡器，进行重新的loadBalance
+            // 获得负载均衡器，进行重新的loadBalance
             MyrpcBootstrap.getInstance().getConfiguration().getLoadBalancer().reLoadBalance(serviceName, addresses);
         }
     }

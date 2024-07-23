@@ -218,6 +218,7 @@ public class MyrpcBootstrap {
                 ServiceConfig<?> serviceConfig = new ServiceConfig<>();
                 serviceConfig.setInterface(anInterface);
                 serviceConfig.setRef(instance);
+                serviceConfig.setGroup(group);
                 if (log.isDebugEnabled()){
                     log.debug("---->已经通过包扫描，将服务【{}】发布.",anInterface);
                 }
@@ -271,6 +272,8 @@ public class MyrpcBootstrap {
     public Configuration getConfiguration() {
         return configuration;
     }
+
+
 
     public static void main(String[] args) {
         MyrpcBootstrap.getInstance().getAllClassNames("com.wlk");
